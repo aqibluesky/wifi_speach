@@ -60,7 +60,7 @@ void app_main()
     event_engine_init();
     nvs_flash_init();
     tcpip_adapter_init();
-    wifi_init_sta("Transee21_TP1","02197545");
+    wifi_init_sta("zhaoyang","12345678");
     //wifi_init_softap();
     /*init gpio*/
     gpio_config_t io_conf;
