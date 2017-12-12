@@ -73,12 +73,12 @@ void app_main()
     gpio_set_level(GPIO_OUTPUT_IO_0, 0);
     /*init codec */
     hal_i2c_init(0,19,18);
-    hal_i2s_init(0,48000,16,2);
+    hal_i2s_init(0,8000,16,1);
     WM8978_Init();
     WM8978_ADDA_Cfg(1,1); 
     WM8978_Input_Cfg(1,0,0);     
     WM8978_Output_Cfg(1,0); 
-    WM8978_MIC_Gain(25);
+    WM8978_MIC_Gain(60);
     WM8978_AUX_Gain(0);
     WM8978_LINEIN_Gain(0);
     WM8978_SPKvol_Set(0);
@@ -135,20 +135,21 @@ void app_main()
     gpio_set_level(GPIO_OUTPUT_IO_0, 1);
 
     uint8_t cnt=0;
+	char* samples_data = malloc(1024);
     while(1){
         gpio_set_level(GPIO_OUTPUT_IO_0, cnt%2);
         //memset(samples_data,0,1024);
         //vTaskDelay(1000 / portTICK_PERIOD_MS);
         //vTaskSuspend(NULL);
         //ESP_LOGI(TAG, "cnt:%d",cnt);
-        //aplay("/sdcard/music.wav");
-        //aplay_mp3("/sdcard/music.mp3");
+       // aplay_mp3("/sdcard/music.mp3");
+       // aplay_wav("/sdcard/music.wav");
 
         //aplay_mp3("/sdcard/music1.mp3");
 
-        //hal_i2s_read(0,samples_data,256,portMAX_DELAY);
-        //hal_i2s_write(0,samples_data,256,portMAX_DELAY);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        hal_i2s_read(0,samples_data,256,portMAX_DELAY);
+        hal_i2s_write(0,samples_data,256,portMAX_DELAY);
+      //  vTaskDelay(5000 / portTICK_PERIOD_MS);
         cnt++;
     }
 }
