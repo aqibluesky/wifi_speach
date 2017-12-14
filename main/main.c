@@ -53,6 +53,62 @@
 
 #define GPIO_OUTPUT_IO_0    5
 #define GPIO_OUTPUT_PIN_SEL  ((1<<GPIO_OUTPUT_IO_0))
+#define SIZE_OF_20MS  320
+
+	xQueueHandle record_data;
+	xQueueHandle play_data;
+
+
+static void record_task( void *pvParameters )
+{
+	char* samples_data = malloc(1024);
+	portBASE_TYPE xStatus;
+	for( ; ; )
+	{
+	        hal_i2s_read(0,samples_data,320,portMAX_DELAY);
+		xStatus = xQueueSendToBack(record_data, samples_data, 0);
+		taskYIELD();
+	
+	}
+
+}
+
+static void play_task( void *pvParameters )
+{
+	char* samples_data = malloc(1024);
+	portBASE_TYPE xStatus;
+	for( ; ; )
+	{
+		xStatus = xQueueReceive(record_data, samples_data, 0);
+	        hal_i2s_write(0,samples_data,320,portMAX_DELAY);
+		taskYIELD();
+	
+	}
+}
+
+static void send_task( void *pvParameters )
+{
+//creat socket  and conncet to server
+	char* samples_data = malloc(1024);
+	int test_client_sockfd;
+	struct sockaddr_in test_client;
+	memset(&test_client, 0, sizeof(test_client));
+	test_client.sin_family = AF_INET;
+	test_client.sin_addr.s_addr = inet_addr("192.168.0.10");
+	test_client.sin_port = htons(96);
+	test_client_sockfd = socket(PF_INET, SOCK_STREAM, 0);
+	connect(test_client_sockfd, (struct sockaddr *)&test_client, sizeof(struct sockaddr));
+
+	portBASE_TYPE xStatus;
+	for( ; ; )
+	{
+		xStatus = xQueueReceive(record_data, samples_data, 0);
+		send(test_client_sockfd, samples_data, 320*50, 0);
+//		xStatus = xQueueSendToBack(play_data, samples_data, 0);
+		taskYIELD();
+	
+	}
+}
 
 void app_main()
 {
@@ -89,6 +145,9 @@ void app_main()
     WM8978_EQ3_Set(0,24);
     WM8978_EQ4_Set(0,24);
     WM8978_EQ5_Set(0,24);
+    //creat queue
+	record_data = xQueueCreate( 10, SIZE_OF_20MS);
+	play_data = xQueueCreate( 10, SIZE_OF_20MS);
     /*init sd card*/
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
@@ -135,7 +194,12 @@ void app_main()
     gpio_set_level(GPIO_OUTPUT_IO_0, 1);
 
     uint8_t cnt=0;
-	char* samples_data = malloc(1024);
+
+//creat record xTask and play xTask
+	xTaskCreate(record_task, "record_task", 4096, NULL, 3, NULL);
+	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
+//	xTaskCreate(send_task, "send_task", 4096, NULL, 3, NULL);
+
     while(1){
         gpio_set_level(GPIO_OUTPUT_IO_0, cnt%2);
         //memset(samples_data,0,1024);
@@ -147,10 +211,10 @@ void app_main()
 
         //aplay_mp3("/sdcard/music1.mp3");
 
-        hal_i2s_read(0,samples_data,256,portMAX_DELAY);
-        hal_i2s_write(0,samples_data,256,portMAX_DELAY);
+//        hal_i2s_read(0,samples_data,320,portMAX_DELAY);
+//	send(test_client_sockfd, samples_data, 320*50, 0);
+//        hal_i2s_write(0,samples_data,320,portMAX_DELAY);
       //  vTaskDelay(5000 / portTICK_PERIOD_MS);
         cnt++;
     }
 }
-
