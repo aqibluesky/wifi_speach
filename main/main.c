@@ -80,16 +80,44 @@
 
 static void record_task( void *pvParameters )
 {
-	MESSAGE_SPEACH message_speach;
+   int server_fd, client_fd;
+   struct sockaddr_in server, client;
+   int socket_fd, on;
+   //struct timeval timeout = {10,0};
+	 socklen_t client_size=sizeof(client);
+   server.sin_family = AF_INET;
+   server.sin_port = htons(888);
+   server.sin_addr.s_addr = htonl(INADDR_ANY);
+ 
+  if((server_fd = socket(AF_INET, SOCK_STREAM, 0))<0) {
+     perror("listen socket uninit\n");
+      return -1;
+    }
+    on=1;
+    //setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(t    imeout));
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int) );
+    //CALIB_DEBUG("on %x\n", on);
+    if((bind(server_fd, (struct sockaddr *)&server, sizeof(server)))<0) {
+      perror("cannot bind srv socket\n");
+      return -1;
+    }
+  
+    if(listen(server_fd, 1)<0) {
+      perror("cannot listen");
+      close(server_fd);
+      return -1;
+    }
+	client_fd=accept(server_fd,(struct sockaddr*)&client,&client_size);
+//	MESSAGE_SPEACH message_speach;
 	portBASE_TYPE xStatus;
-	message_speach.message_type = SPEACH;
-	int *p_sockfd = (int*)pvParameters;
+//	message_speach.message_type = SPEACH;
+	char *databuff = (char *)malloc(320);
+//	int *p_sockfd = (int*)pvParameters;
 	for( ; ; )
 	{
-	        hal_i2s_read(0,message_speach.speach_data,320,portMAX_DELAY);
-		xStatus = xQueueSendToBack(record_data,&message_speach, 0);
-		send(*p_sockfd, "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111", 20, 0);
-	//	send(*p_sockfd, "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111", MESSAGE_SPEACH_SIZE, 0);
+	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
+	//	xStatus = xQueueSendToBack(record_data,&message_speach, 0);
+		write( client_fd, databuff,320);
 		taskYIELD();
 	
 	}
@@ -98,17 +126,21 @@ static void record_task( void *pvParameters )
 
 static void play_task( void *pvParameters )
 {
-	MESSAGE_SPEACH message_speach;
+//	MESSAGE_SPEACH message_speach;
+	int sockfd;
+	connect_socket("127.0.0.1", 888, &sockfd);
 	portBASE_TYPE xStatus;
-	message_speach.message_type = SPEACH;
-	int *p_sockfd = (int*)pvParameters;
+//	message_speach.message_type = SPEACH;
+//	int *p_sockfd = (int*)pvParameters;
+	char *databuff = (char *)malloc(320);
 	for( ; ; )
 	{
-		xStatus = xQueueReceive(record_data, &message_speach, 0);
-		if(message_speach.message_type == SPEACH){
-	        hal_i2s_write(0,message_speach.speach_data,320,portMAX_DELAY);
-		taskYIELD();
-		}
+	//	xStatus = xQueueReceive(record_data, &message_speach, 0);
+	//	if(message_speach.message_type == SPEACH){
+			recv(sockfd, databuff, 320, 0);
+	        hal_i2s_write(0,databuff,320,portMAX_DELAY);
+			taskYIELD();
+	//	}
 	
 	}
 }
@@ -241,7 +273,8 @@ void app_main()
     // xTaskCreate(&ftpd_task, "ftpd_task",4096, NULL, 5, NULL);
     //xTaskCreate(&euler_task, "euler_task", 8196, NULL, 5, NULL);
     // xTaskCreate(webserver_task, "web_server_task", 4096, NULL, +6, NULL);
-    /*print the last ram*/
+
+	/*print the last ram*/
     size_t free8start=heap_caps_get_free_size(MALLOC_CAP_8BIT);
     size_t free32start=heap_caps_get_free_size(MALLOC_CAP_32BIT);
     ESP_LOGI(TAG,"free mem8bit: %d mem32bit: %d\n",free8start,free32start);
@@ -250,17 +283,14 @@ void app_main()
 
     uint8_t cnt=0;
 	
-	int sockfd;
-	connect_socket("192.168.1.119", 8887, &sockfd);
-	int sockfd_server_test;
-	sockfd_server_test = creat_server(htons(888), htonl(INADDR_ANY));
-//	sockfd_server_test =  creat_socket_server(htons(888),htonl(INADDR_ANY));
-//	int server_sockfd;
-//	server_socket(8889, &server_sockfd);
+//	int sockfd;
+//	connect_socket("192.168.1.119", 8887, &sockfd);
+//	int sockfd_server_test;
+//	sockfd_server_test = creat_server(htons(888), htonl(INADDR_ANY));
+
 //creat record xTask and play xTask
-	xTaskCreate(record_task, "record_task", 9000, &sockfd, 3, NULL);
-	xTaskCreate(play_task, "play_task", 4096, &sockfd, 3, NULL);
-//	xTaskCreate(send_task, "send_task", 4096, NULL, 3, NULL);
+	xTaskCreate(record_task, "record_task", 9000, NULL, 4, NULL);
+	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
 
     while(1){
         gpio_set_level(GPIO_OUTPUT_IO_0, cnt%2);
@@ -270,9 +300,6 @@ void app_main()
         //ESP_LOGI(TAG, "cnt:%d",cnt);
        // aplay_mp3("/sdcard/music.mp3");
        // aplay_wav("/sdcard/music.wav");
-
-        //aplay_mp3("/sdcard/music1.mp3");
-
 //        hal_i2s_read(0,samples_data,320,portMAX_DELAY);
 //	send(test_client_sockfd, samples_data, 320*50, 0);
 //        hal_i2s_write(0,samples_data,320,portMAX_DELAY);
@@ -280,3 +307,66 @@ void app_main()
         cnt++;
     }
 }
+
+void send_data(void *pvParameters)
+{
+    int len = 0;
+    char *databuff = (char *)malloc(EXAMPLE_DEFAULT_PKTSIZE * sizeof(char));
+    memset(databuff, EXAMPLE_PACK_BYTE_IS, EXAMPLE_DEFAULT_PKTSIZE);
+    vTaskDelay(100 / portTICK_RATE_MS);
+    ESP_LOGI(TAG, "start sending...");
+    while (1) {
+        int to_write = EXAMPLE_DEFAULT_PKTSIZE;
+        //send function
+        while (to_write > 0) {
+            len = send(connect_socket, databuff + (EXAMPLE_DEFAULT_PKTSIZE - to_write), to_write, 0);
+            if (len > 0) {
+                g_total_data += len;
+                to_write -= len;
+            } else {
+                int err = get_socket_error_code(connect_socket);
+                if (err != ENOMEM) {
+                    show_socket_error_reason("send_data", connect_socket);
+                    break;
+                }
+            }
+        }
+        if (g_total_data > 0) {
+        } else {
+            break;
+        }
+    }
+    g_rxtx_need_restart = true;
+    free(databuff);
+    vTaskDelete(NULL);
+}
+
+//receive data
+void recv_data(void *pvParameters)
+{
+    int len = 0;
+    char *databuff = (char *)malloc(EXAMPLE_DEFAULT_PKTSIZE * sizeof(char));
+    while (1) {
+        int to_recv = EXAMPLE_DEFAULT_PKTSIZE;
+        while (to_recv > 0) {
+            len = recv(connect_socket, databuff + (EXAMPLE_DEFAULT_PKTSIZE - to_recv), to_recv, 0);
+            if (len > 0) {
+                g_total_data += len;
+                to_recv -= len;
+            } else {
+                show_socket_error_reason("recv_data", connect_socket);
+                break;
+            }
+        }
+        if (g_total_data > 0) {
+            continue;
+        } else {
+            break;
+        }
+    }
+
+    g_rxtx_need_restart = true;
+    free(databuff);
+    vTaskDelete(NULL);
+}
+
