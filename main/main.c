@@ -55,18 +55,41 @@
 #define GPIO_OUTPUT_PIN_SEL  ((1<<GPIO_OUTPUT_IO_0))
 #define SIZE_OF_20MS  320
 
+	typedef enum _MESSAGE_TYPE{
+		CONTROL,
+		SPEACH	
+	}MESSAGE_TYPE;
+
+	typedef struct _MESSAGE_SPEACH{
+		MESSAGE_TYPE message_type;
+		char speach_data[SIZE_OF_20MS];
+	}MESSAGE_SPEACH;
+
+	typedef struct _MESSAGE_CONTROL{
+		MESSAGE_TYPE message_type;
+		int control_number;
+	}MESSAGE_CONTROL;
+
+	int MESSAGE_TYPE_SIZE = sizeof(MESSAGE_TYPE);
+	int MESSAGE_SPEACH_SIZE = sizeof(MESSAGE_SPEACH);
+ 	int MESSAGE_CONTROL_SIZE = sizeof(MESSAGE_CONTROL);
+
 	xQueueHandle record_data;
 	xQueueHandle play_data;
 
 
 static void record_task( void *pvParameters )
 {
-	char* samples_data = malloc(1024);
+	MESSAGE_SPEACH message_speach;
 	portBASE_TYPE xStatus;
+	message_speach.message_type = SPEACH;
+	int *p_sockfd = (int*)pvParameters;
 	for( ; ; )
 	{
-	        hal_i2s_read(0,samples_data,320,portMAX_DELAY);
-		xStatus = xQueueSendToBack(record_data, samples_data, 0);
+	        hal_i2s_read(0,message_speach.speach_data,320,portMAX_DELAY);
+		xStatus = xQueueSendToBack(record_data,&message_speach, 0);
+		send(*p_sockfd, "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111", 20, 0);
+	//	send(*p_sockfd, "11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111", MESSAGE_SPEACH_SIZE, 0);
 		taskYIELD();
 	
 	}
@@ -75,48 +98,80 @@ static void record_task( void *pvParameters )
 
 static void play_task( void *pvParameters )
 {
-	char* samples_data = malloc(1024);
+	MESSAGE_SPEACH message_speach;
 	portBASE_TYPE xStatus;
+	message_speach.message_type = SPEACH;
+	int *p_sockfd = (int*)pvParameters;
 	for( ; ; )
 	{
-		xStatus = xQueueReceive(record_data, samples_data, 0);
-	        hal_i2s_write(0,samples_data,320,portMAX_DELAY);
+		xStatus = xQueueReceive(record_data, &message_speach, 0);
+		if(message_speach.message_type == SPEACH){
+	        hal_i2s_write(0,message_speach.speach_data,320,portMAX_DELAY);
 		taskYIELD();
+		}
 	
 	}
 }
 
-static void send_task( void *pvParameters )
+ 
+int creat_server(in_port_t in_port, in_addr_t in_addr)
+ {
+   int server_fd, client_fd;
+   struct sockaddr_in server, client;
+   int socket_fd, on;
+   //struct timeval timeout = {10,0};
+ 
+   server.sin_family = AF_INET;
+   server.sin_port = in_port;
+   server.sin_addr.s_addr = in_addr;
+ 
+  if((server_fd = socket(AF_INET, SOCK_STREAM, 0))<0) {
+     perror("listen socket uninit\n");
+      return -1;
+    }
+    on=1;
+    //setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(t    imeout));
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int) );
+    //CALIB_DEBUG("on %x\n", on);
+    if((bind(server_fd, (struct sockaddr *)&server, sizeof(server)))<0) {
+      perror("cannot bind srv socket\n");
+      return -1;
+    }
+  
+    if(listen(server_fd, 1)<0) {
+      perror("cannot listen");
+      close(server_fd);
+      return -1;
+    }
+  
+   return server_fd;
+ }
+
+
+static int connect_socket(char *addr, int port, int *sockfd)
 {
 //creat socket  and conncet to server
-	char* samples_data = malloc(1024);
 	int test_client_sockfd;
 	struct sockaddr_in test_client;
 	memset(&test_client, 0, sizeof(test_client));
 	test_client.sin_family = AF_INET;
-	test_client.sin_addr.s_addr = inet_addr("192.168.0.10");
-	test_client.sin_port = htons(96);
+	test_client.sin_addr.s_addr = inet_addr(addr);
+	test_client.sin_port = htons(port);
 	test_client_sockfd = socket(PF_INET, SOCK_STREAM, 0);
 	connect(test_client_sockfd, (struct sockaddr *)&test_client, sizeof(struct sockaddr));
-
-	portBASE_TYPE xStatus;
-	for( ; ; )
-	{
-		xStatus = xQueueReceive(record_data, samples_data, 0);
-		send(test_client_sockfd, samples_data, 320*50, 0);
-//		xStatus = xQueueSendToBack(play_data, samples_data, 0);
-		taskYIELD();
-	
-	}
+	*sockfd = test_client_sockfd;
+	return 0;
 }
+
 
 void app_main()
 {
+
     esp_err_t err;
     event_engine_init();
     nvs_flash_init();
     tcpip_adapter_init();
-    wifi_init_sta("zhaoyang","12345678");
+    wifi_init_sta("wuhulanren","wuhulanren");
     //wifi_init_softap();
     /*init gpio*/
     gpio_config_t io_conf;
@@ -146,8 +201,8 @@ void app_main()
     WM8978_EQ4_Set(0,24);
     WM8978_EQ5_Set(0,24);
     //creat queue
-	record_data = xQueueCreate( 10, SIZE_OF_20MS);
-	play_data = xQueueCreate( 10, SIZE_OF_20MS);
+	record_data = xQueueCreate( 10, MESSAGE_SPEACH_SIZE);
+	play_data = xQueueCreate( 10, MESSAGE_SPEACH_SIZE);
     /*init sd card*/
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
@@ -194,10 +249,17 @@ void app_main()
     gpio_set_level(GPIO_OUTPUT_IO_0, 1);
 
     uint8_t cnt=0;
-
+	
+	int sockfd;
+	connect_socket("192.168.1.119", 8887, &sockfd);
+	int sockfd_server_test;
+	sockfd_server_test = creat_server(htons(888), htonl(INADDR_ANY));
+//	sockfd_server_test =  creat_socket_server(htons(888),htonl(INADDR_ANY));
+//	int server_sockfd;
+//	server_socket(8889, &server_sockfd);
 //creat record xTask and play xTask
-	xTaskCreate(record_task, "record_task", 4096, NULL, 3, NULL);
-	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
+	xTaskCreate(record_task, "record_task", 9000, &sockfd, 3, NULL);
+	xTaskCreate(play_task, "play_task", 4096, &sockfd, 3, NULL);
 //	xTaskCreate(send_task, "send_task", 4096, NULL, 3, NULL);
 
     while(1){
