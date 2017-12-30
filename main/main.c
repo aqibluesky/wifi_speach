@@ -78,6 +78,10 @@
 	xQueueHandle play_data;
 
 int connect_socket(char *addr, int port, int *sockfd);
+void send_data(int sockfd, char *databuff, int data_len);
+void recv_data(int sockfd, char *databuff, int data_len);
+
+
 
 static void record_task( void *pvParameters )
 {
@@ -118,7 +122,7 @@ static void record_task( void *pvParameters )
 	{
 	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
 	//	xStatus = xQueueSendToBack(record_data,&message_speach, 0);
-		write( client_fd, databuff,320);
+		send_data( client_fd, databuff,320);
 		taskYIELD();
 	
 	}
@@ -138,7 +142,7 @@ static void play_task( void *pvParameters )
 	{
 	//	xStatus = xQueueReceive(record_data, &message_speach, 0);
 	//	if(message_speach.message_type == SPEACH){
-			recv(sockfd, databuff, 320, 0);
+			recv_data(sockfd, databuff, 320, 0);
 	        hal_i2s_write(0,databuff,320,portMAX_DELAY);
 			taskYIELD();
 	//	}
@@ -308,4 +312,48 @@ void app_main()
         cnt++;
     }
 }
+
+void send_data( int sockfd, char *databuff, int data_len)
+{
+    int len = 0;
+    memset(databuff, 0, data_len);
+    ESP_LOGI(TAG, "start sending...");
+    int to_write = data_len;
+
+        //send function
+        while (to_write > 0) {
+            len = send(sockfd, databuff + (data_len - to_write), to_write, 0);
+            if (len > 0) {
+                to_write -= len;
+            } else {
+                int err = get_socket_error_code(sockfd);
+
+                if (err != ENOMEM) {
+                    show_socket_error_reason("send_data", sockfd);
+                    break;
+                }
+            }
+        }
+//    free(databuff);
+//    vTaskDelete(NULL);
+}
+
+//receive data
+void recv_data( int sockfd, char *databuff, int data_len)
+{
+    int len = 0;  
+    int to_recv = data_len;
+        while (to_recv > 0) {
+            len = recv(sockfd, databuff + (data_len - to_recv), to_recv, 0);
+            if (len > 0) {
+                to_recv -= len;
+            } else {
+                show_socket_error_reason("recv_data", sockfd);
+                break;
+            }
+        }
+//    free(databuff);
+//    vTaskDelete(NULL);
+}
+
 
