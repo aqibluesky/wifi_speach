@@ -80,8 +80,8 @@
 int connect_socket(char *addr, int port, int *sockfd);
 void send_data(int sockfd, char *databuff, int data_len);
 void recv_data(int sockfd, char *databuff, int data_len);
-
-
+int get_socket_error_code(int socket);
+int show_socket_error_reason(const char *str, int socket);
 
 static void record_task( void *pvParameters )
 {
@@ -122,7 +122,7 @@ static void record_task( void *pvParameters )
 	{
 	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
 	//	xStatus = xQueueSendToBack(record_data,&message_speach, 0);
-		send_data( client_fd, databuff,320);
+		write( client_fd, databuff,320);
 		taskYIELD();
 	
 	}
@@ -142,7 +142,7 @@ static void play_task( void *pvParameters )
 	{
 	//	xStatus = xQueueReceive(record_data, &message_speach, 0);
 	//	if(message_speach.message_type == SPEACH){
-			recv_data(sockfd, databuff, 320, 0);
+			recv(sockfd, databuff, 320, 0);
 	        hal_i2s_write(0,databuff,320,portMAX_DELAY);
 			taskYIELD();
 	//	}
@@ -354,6 +354,28 @@ void recv_data( int sockfd, char *databuff, int data_len)
         }
 //    free(databuff);
 //    vTaskDelete(NULL);
+}
+int get_socket_error_code(int socket)
+{
+    int result;
+    u32_t optlen = sizeof(int);
+    int err = getsockopt(socket, SOL_SOCKET, SO_ERROR, &result, &optlen);
+    if (err == -1) {
+        ESP_LOGE(TAG, "getsockopt failed:%s", strerror(err));
+        return -1;
+    }
+    return result;
+}
+
+int show_socket_error_reason(const char *str, int socket)
+{
+    int err = get_socket_error_code(socket);
+
+    if (err != 0) {
+        ESP_LOGW(TAG, "%s socket error %d %s", str, err, strerror(err));
+    }
+
+    return err;
 }
 
 
