@@ -77,6 +77,7 @@
 	xQueueHandle record_data;
 	xQueueHandle play_data;
 
+int connect_socket(char *addr, int port, int *sockfd);
 
 static void record_task( void *pvParameters )
 {
@@ -180,7 +181,7 @@ int creat_server(in_port_t in_port, in_addr_t in_addr)
  }
 
 
-static int connect_socket(char *addr, int port, int *sockfd)
+int connect_socket(char *addr, int port, int *sockfd)
 {
 //creat socket  and conncet to server
 	int test_client_sockfd;
@@ -203,7 +204,7 @@ void app_main()
     event_engine_init();
     nvs_flash_init();
     tcpip_adapter_init();
-    wifi_init_sta("wuhulanren","wuhulanren");
+    wifi_init_sta("wt","123654789");
     //wifi_init_softap();
     /*init gpio*/
     gpio_config_t io_conf;
@@ -306,67 +307,5 @@ void app_main()
       //  vTaskDelay(5000 / portTICK_PERIOD_MS);
         cnt++;
     }
-}
-
-void send_data(void *pvParameters)
-{
-    int len = 0;
-    char *databuff = (char *)malloc(EXAMPLE_DEFAULT_PKTSIZE * sizeof(char));
-    memset(databuff, EXAMPLE_PACK_BYTE_IS, EXAMPLE_DEFAULT_PKTSIZE);
-    vTaskDelay(100 / portTICK_RATE_MS);
-    ESP_LOGI(TAG, "start sending...");
-    while (1) {
-        int to_write = EXAMPLE_DEFAULT_PKTSIZE;
-        //send function
-        while (to_write > 0) {
-            len = send(connect_socket, databuff + (EXAMPLE_DEFAULT_PKTSIZE - to_write), to_write, 0);
-            if (len > 0) {
-                g_total_data += len;
-                to_write -= len;
-            } else {
-                int err = get_socket_error_code(connect_socket);
-                if (err != ENOMEM) {
-                    show_socket_error_reason("send_data", connect_socket);
-                    break;
-                }
-            }
-        }
-        if (g_total_data > 0) {
-        } else {
-            break;
-        }
-    }
-    g_rxtx_need_restart = true;
-    free(databuff);
-    vTaskDelete(NULL);
-}
-
-//receive data
-void recv_data(void *pvParameters)
-{
-    int len = 0;
-    char *databuff = (char *)malloc(EXAMPLE_DEFAULT_PKTSIZE * sizeof(char));
-    while (1) {
-        int to_recv = EXAMPLE_DEFAULT_PKTSIZE;
-        while (to_recv > 0) {
-            len = recv(connect_socket, databuff + (EXAMPLE_DEFAULT_PKTSIZE - to_recv), to_recv, 0);
-            if (len > 0) {
-                g_total_data += len;
-                to_recv -= len;
-            } else {
-                show_socket_error_reason("recv_data", connect_socket);
-                break;
-            }
-        }
-        if (g_total_data > 0) {
-            continue;
-        } else {
-            break;
-        }
-    }
-
-    g_rxtx_need_restart = true;
-    free(databuff);
-    vTaskDelete(NULL);
 }
 
