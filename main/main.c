@@ -89,6 +89,8 @@ static void play_task( void *pvParameters )
 //	MESSAGE_SPEACH message_speach;
 	int sockfd;
 	portTickType xLastWakeTime;
+	unsigned portBASE_TYPE uxPriority;
+    uxPriority = uxTaskPriorityGet( NULL );
 	vTaskDelay(50 / portTICK_PERIOD_MS);
 	connect_socket("127.0.0.1", 888, &sockfd);
 	portBASE_TYPE xStatus;
@@ -102,6 +104,7 @@ static void play_task( void *pvParameters )
 	//	if(message_speach.message_type == SPEACH){
 			recv(sockfd, databuff, 320, 0);
 	        hal_i2s_write(0,databuff,320,portMAX_DELAY);
+			vTaskPrioritySet(play_task, (uxPriority - 2));
 			vTaskDelayUntil(&xLastWakeTime, (19 / portTICK_PERIOD_MS));
 			taskYIELD();
 	//	}
@@ -113,6 +116,8 @@ static void record_task( void *pvParameters )
 {
    int client_fd;
    portTickType xLastWakeTime;
+   unsigned portBASE_TYPE uxPriority;
+   uxPriority = uxTaskPriorityGet( NULL );
 	client_fd=creat_server( htons(888), htonl(INADDR_ANY));
 //	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
 //	MESSAGE_SPEACH message_speach;
@@ -126,6 +131,7 @@ static void record_task( void *pvParameters )
 	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
 	//	xStatus = xQueueSendToBack(record_data,&message_speach, 0);
 		write( client_fd, databuff,320);
+		vTaskPrioritySet(play_task, (uxPriority + 1));
 		vTaskDelayUntil(&xLastWakeTime, (19 / portTICK_PERIOD_MS));
 		taskYIELD();
 	
