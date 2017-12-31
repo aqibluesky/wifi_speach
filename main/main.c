@@ -100,6 +100,7 @@ static void play_task( void *pvParameters )
 	//	if(message_speach.message_type == SPEACH){
 			recv(sockfd, databuff, 320, 0);
 	        hal_i2s_write(0,databuff,320,portMAX_DELAY);
+			vTaskDelay(18 / portTICK_PERIOD_MS);
 			taskYIELD();
 	//	}
 	
@@ -121,6 +122,7 @@ static void record_task( void *pvParameters )
 	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
 	//	xStatus = xQueueSendToBack(record_data,&message_speach, 0);
 		write( client_fd, databuff,320);
+		vTaskDelay(18 / portTICK_PERIOD_MS);
 		taskYIELD();
 	
 	}
