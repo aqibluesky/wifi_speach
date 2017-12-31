@@ -84,26 +84,6 @@ void recv_data(int sockfd, char *databuff, int data_len);
 int get_socket_error_code(int socket);
 int show_socket_error_reason(const char *str, int socket);
 
-static void record_task( void *pvParameters )
-{
-   int client_fd;
-	client_fd=creat_server( htons(888), htonl(INADDR_ANY));
-//	MESSAGE_SPEACH message_speach;
-	portBASE_TYPE xStatus;
-//	message_speach.message_type = SPEACH;
-	char *databuff = (char *)malloc(320);
-//	int *p_sockfd = (int*)pvParameters;
-	for( ; ; )
-	{
-	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
-	//	xStatus = xQueueSendToBack(record_data,&message_speach, 0);
-		write( client_fd, databuff,320);
-		taskYIELD();
-	
-	}
-
-}
-
 static void play_task( void *pvParameters )
 {
 //	MESSAGE_SPEACH message_speach;
@@ -125,6 +105,28 @@ static void play_task( void *pvParameters )
 	
 	}
 }
+
+static void record_task( void *pvParameters )
+{
+   int client_fd;
+	client_fd=creat_server( htons(888), htonl(INADDR_ANY));
+	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
+//	MESSAGE_SPEACH message_speach;
+	portBASE_TYPE xStatus;
+//	message_speach.message_type = SPEACH;
+	char *databuff = (char *)malloc(320);
+//	int *p_sockfd = (int*)pvParameters;
+	for( ; ; )
+	{
+	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
+	//	xStatus = xQueueSendToBack(record_data,&message_speach, 0);
+		write( client_fd, databuff,320);
+		taskYIELD();
+	
+	}
+
+}
+
 
 void app_main()
 {
@@ -220,7 +222,7 @@ void app_main()
 
 //creat record xTask and play xTask
 	xTaskCreate(record_task, "record_task", 9000, NULL, 4, NULL);
-	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
+//	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
 
     while(1){
         gpio_set_level(GPIO_OUTPUT_IO_0, cnt%2);
@@ -276,7 +278,6 @@ int creat_server(in_port_t in_port, in_addr_t in_addr)
     }
     /*connection established，now can send/recv*/
     ESP_LOGI(TAG, "tcp connection established!");
-    return ESP_OK;
    	return client_fd;
  }
 
