@@ -76,7 +76,8 @@
 
 	xQueueHandle record_data;
 	xQueueHandle play_data;
-
+	
+int creat_server(in_port_t in_port, in_addr_t in_addr);
 int connect_socket(char *addr, int port, int *sockfd);
 void send_data(int sockfd, char *databuff, int data_len);
 void recv_data(int sockfd, char *databuff, int data_len);
@@ -85,34 +86,8 @@ int show_socket_error_reason(const char *str, int socket);
 
 static void record_task( void *pvParameters )
 {
-   int server_fd, client_fd;
-   struct sockaddr_in server, client;
-   int socket_fd, on;
-   //struct timeval timeout = {10,0};
-	 socklen_t client_size=sizeof(client);
-   server.sin_family = AF_INET;
-   server.sin_port = htons(888);
-   server.sin_addr.s_addr = htonl(INADDR_ANY);
- 
-  if((server_fd = socket(AF_INET, SOCK_STREAM, 0))<0) {
-     perror("listen socket uninit\n");
-      return -1;
-    }
-    on=1;
-    //setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(t    imeout));
-    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int) );
-    //CALIB_DEBUG("on %x\n", on);
-    if((bind(server_fd, (struct sockaddr *)&server, sizeof(server)))<0) {
-      perror("cannot bind srv socket\n");
-      return -1;
-    }
-  
-    if(listen(server_fd, 1)<0) {
-      perror("cannot listen");
-      close(server_fd);
-      return -1;
-    }
-	client_fd=accept(server_fd,(struct sockaddr*)&client,&client_size);
+   int client_fd;
+	client_fd=creat_server( htons(888), htonl(INADDR_ANY));
 //	MESSAGE_SPEACH message_speach;
 	portBASE_TYPE xStatus;
 //	message_speach.message_type = SPEACH;
@@ -133,6 +108,7 @@ static void play_task( void *pvParameters )
 {
 //	MESSAGE_SPEACH message_speach;
 	int sockfd;
+	 vTaskDelay(50 / portTICK_PERIOD_MS);
 	connect_socket("127.0.0.1", 888, &sockfd);
 	portBASE_TYPE xStatus;
 //	message_speach.message_type = SPEACH;
@@ -149,57 +125,6 @@ static void play_task( void *pvParameters )
 	
 	}
 }
-
- 
-int creat_server(in_port_t in_port, in_addr_t in_addr)
- {
-   int server_fd, client_fd;
-   struct sockaddr_in server, client;
-   int socket_fd, on;
-   //struct timeval timeout = {10,0};
- 
-   server.sin_family = AF_INET;
-   server.sin_port = in_port;
-   server.sin_addr.s_addr = in_addr;
- 
-  if((server_fd = socket(AF_INET, SOCK_STREAM, 0))<0) {
-     perror("listen socket uninit\n");
-      return -1;
-    }
-    on=1;
-    //setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(t    imeout));
-    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int) );
-    //CALIB_DEBUG("on %x\n", on);
-    if((bind(server_fd, (struct sockaddr *)&server, sizeof(server)))<0) {
-      perror("cannot bind srv socket\n");
-      return -1;
-    }
-  
-    if(listen(server_fd, 1)<0) {
-      perror("cannot listen");
-      close(server_fd);
-      return -1;
-    }
-  
-   return server_fd;
- }
-
-
-int connect_socket(char *addr, int port, int *sockfd)
-{
-//creat socket  and conncet to server
-	int test_client_sockfd;
-	struct sockaddr_in test_client;
-	memset(&test_client, 0, sizeof(test_client));
-	test_client.sin_family = AF_INET;
-	test_client.sin_addr.s_addr = inet_addr(addr);
-	test_client.sin_port = htons(port);
-	test_client_sockfd = socket(PF_INET, SOCK_STREAM, 0);
-	connect(test_client_sockfd, (struct sockaddr *)&test_client, sizeof(struct sockaddr));
-	*sockfd = test_client_sockfd;
-	return 0;
-}
-
 
 void app_main()
 {
@@ -311,6 +236,63 @@ void app_main()
       //  vTaskDelay(5000 / portTICK_PERIOD_MS);
         cnt++;
     }
+}
+
+int creat_server(in_port_t in_port, in_addr_t in_addr)
+ {
+   int server_fd, client_fd;
+   struct sockaddr_in server, client;
+   int socket_fd, on;
+   socklen_t client_size=sizeof(client);
+   //struct timeval timeout = {10,0};
+ 
+   server.sin_family = AF_INET;
+   server.sin_port = in_port;
+   server.sin_addr.s_addr = in_addr;
+ 
+  if((server_fd = socket(AF_INET, SOCK_STREAM, 0))<0) {
+     perror("listen socket uninit\n");
+      return -1;
+    }
+    on=1;
+    //setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(t    imeout));
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int) );
+    //CALIB_DEBUG("on %x\n", on);
+    if((bind(server_fd, (struct sockaddr *)&server, sizeof(server)))<0) {
+      perror("cannot bind srv socket\n");
+      return -1;
+    }
+  
+    if(listen(server_fd, 1)<0) {
+      perror("cannot listen");
+      close(server_fd);
+      return -1;
+    }
+   client_fd = accept(server_fd, (struct sockaddr *)&client, &client_size);
+    if (connect_socket < 0) {
+        show_socket_error_reason("accept_server", client_fd);
+        close(server_fd);
+        return ESP_FAIL;
+    }
+    /*connection established，now can send/recv*/
+    ESP_LOGI(TAG, "tcp connection established!");
+    return ESP_OK;
+   	return client_fd;
+ }
+
+int connect_socket(char *addr, int port, int *sockfd)
+{
+//creat socket  and conncet to server
+	int test_client_sockfd;
+	struct sockaddr_in test_client;
+	memset(&test_client, 0, sizeof(test_client));
+	test_client.sin_family = AF_INET;
+	test_client.sin_addr.s_addr = inet_addr(addr);
+	test_client.sin_port = htons(port);
+	test_client_sockfd = socket(PF_INET, SOCK_STREAM, 0);
+	connect(test_client_sockfd, (struct sockaddr *)&test_client, sizeof(struct sockaddr));
+	*sockfd = test_client_sockfd;
+	return 0;
 }
 
 void send_data( int sockfd, char *databuff, int data_len)
