@@ -110,7 +110,7 @@ static void record_task( void *pvParameters )
 {
    int client_fd;
 	client_fd=creat_server( htons(888), htonl(INADDR_ANY));
-	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
+//	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
 //	MESSAGE_SPEACH message_speach;
 	portBASE_TYPE xStatus;
 //	message_speach.message_type = SPEACH;
@@ -222,7 +222,7 @@ void app_main()
 
 //creat record xTask and play xTask
 	xTaskCreate(record_task, "record_task", 9000, NULL, 4, NULL);
-//	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
+	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
 
     while(1){
         gpio_set_level(GPIO_OUTPUT_IO_0, cnt%2);
