@@ -87,22 +87,22 @@ int show_socket_error_reason(const char *str, int socket);
 static void play_task( void *pvParameters )
 {
 //	MESSAGE_SPEACH message_speach;
-	int sockfd;
+//	int sockfd;
 	portTickType xLastWakeTime;
 	unsigned portBASE_TYPE uxPriority;
     uxPriority = uxTaskPriorityGet( NULL );
 	vTaskDelay(10 / portTICK_PERIOD_MS);
-	connect_socket("127.0.0.1", 888, &sockfd);
+//	connect_socket("127.0.0.1", 888, &sockfd);
 	portBASE_TYPE xStatus;
 //	message_speach.message_type = SPEACH;
-//	int *p_sockfd = (int*)pvParameters;
+	int *p_sockfd = (int*)pvParameters;
 	char *databuff = (char *)malloc(320);
 	xLastWakeTime = xTaskGetTickCount( );
 	for( ; ; )
 	{
 	//	xStatus = xQueueReceive(record_data, &message_speach, 0);
 	//	if(message_speach.message_type == SPEACH){
-			recv(sockfd, databuff, 320, 0);
+			recv(*p_sockfd, databuff, 320, 0);
 	        hal_i2s_write(0,databuff,320,portMAX_DELAY);
 			vTaskPrioritySet(play_task, (uxPriority - 2));
 			vTaskDelayUntil(&xLastWakeTime, (20 / portTICK_PERIOD_MS));
@@ -114,23 +114,23 @@ static void play_task( void *pvParameters )
 
 static void record_task( void *pvParameters )
 {
-   int client_fd;
+//   int client_fd;
    portTickType xLastWakeTime;
    unsigned portBASE_TYPE uxPriority;
    uxPriority = uxTaskPriorityGet( NULL );
-	client_fd=creat_server( htons(888), htonl(INADDR_ANY));
+//	client_fd=creat_server( htons(888), htonl(INADDR_ANY));
 //	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
 //	MESSAGE_SPEACH message_speach;
 	portBASE_TYPE xStatus;
 //	message_speach.message_type = SPEACH;
 	char *databuff = (char *)malloc(320);
 	xLastWakeTime = xTaskGetTickCount( );
-//	int *p_sockfd = (int*)pvParameters;
+	int *p_sockfd = (int*)pvParameters;
 	for( ; ; )
 	{
 	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
 	//	xStatus = xQueueSendToBack(record_data,&message_speach, 0);
-		write( client_fd, databuff,320);
+		write( *p_sockfd, databuff,320);
 		vTaskPrioritySet(play_task, (uxPriority + 1));
 		vTaskDelayUntil(&xLastWakeTime, (20 / portTICK_PERIOD_MS));
 		taskYIELD();
@@ -177,8 +177,8 @@ void app_main()
     WM8978_EQ4_Set(0,24);
     WM8978_EQ5_Set(0,24);
     //creat queue
-	record_data = xQueueCreate( 10, MESSAGE_SPEACH_SIZE);
-	play_data = xQueueCreate( 10, MESSAGE_SPEACH_SIZE);
+	record_data = xQueueCreate( 10, 320);
+	play_data = xQueueCreate( 10, 320);
     /*init sd card*/
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
@@ -226,15 +226,14 @@ void app_main()
     gpio_set_level(GPIO_OUTPUT_IO_0, 1);
 
     uint8_t cnt=0;
-	
-//	int sockfd;
-//	connect_socket("192.168.1.119", 8887, &sockfd);
-//	int sockfd_server_test;
-//	sockfd_server_test = creat_server(htons(888), htonl(INADDR_ANY));
+	int sockfd_server_test;
+	sockfd_server_test = creat_server( htons(888), htonl(INADDR_ANY));
+	int sockfd_client_test;
+	connect_socket("127.0.0.1", 888, &sockfd_client_test);
 
 //creat record xTask and play xTask
-	xTaskCreate(record_task, "record_task", 9000, NULL, 4, NULL);
-	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
+	xTaskCreate(record_task, "record_task", 9000, &sockfd_server_test, 4, NULL);
+	xTaskCreate(play_task, "play_task", 4096, &sockfd_client_test, 3, NULL);
 
     while(1){
         gpio_set_level(GPIO_OUTPUT_IO_0, cnt%2);
