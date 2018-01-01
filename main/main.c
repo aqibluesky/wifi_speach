@@ -122,10 +122,11 @@ static void recv_task( void *pvParameters )
 	connect_socket("127.0.0.1", 888, &sockfd);
 	portBASE_TYPE xStatus;
 	char *databuff = (char *)malloc(320);
+	int recv_len;
 	xLastWakeTime = xTaskGetTickCount( );
 	for( ; ; )
 	{	
-			recv(sockfd, databuff, 320, 0);
+			recv_len = recv(sockfd, databuff, 320, 0);
 			xStatus = xQueueSendToBack(play_data,databuff, 0);
 			vTaskDelayUntil(&xLastWakeTime, (18 / portTICK_PERIOD_MS));	
 	}
@@ -155,7 +156,7 @@ void app_main()
     event_engine_init();
     nvs_flash_init();
     tcpip_adapter_init();
-    wifi_init_sta("wt","123654789");
+    wifi_init_sta("zhaoyang","12365478");
     //wifi_init_softap();
     /*init gpio*/
     gpio_config_t io_conf;
