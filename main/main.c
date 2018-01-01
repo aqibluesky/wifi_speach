@@ -86,53 +86,61 @@ int show_socket_error_reason(const char *str, int socket);
 
 static void play_task( void *pvParameters )
 {
-//	MESSAGE_SPEACH message_speach;
-//	int sockfd;
-	portTickType xLastWakeTime;
-	unsigned portBASE_TYPE uxPriority;
-    uxPriority = uxTaskPriorityGet( NULL );
-	vTaskDelay(10 / portTICK_PERIOD_MS);
-//	connect_socket("127.0.0.1", 888, &sockfd);
 	portBASE_TYPE xStatus;
-//	message_speach.message_type = SPEACH;
-	int *p_sockfd = (int*)pvParameters;
 	char *databuff = (char *)malloc(320);
-	xLastWakeTime = xTaskGetTickCount( );
 	for( ; ; )
 	{
-	//	xStatus = xQueueReceive(record_data, &message_speach, 0);
-	//	if(message_speach.message_type == SPEACH){
-			recv(*p_sockfd, databuff, 320, 0);
+			xStatus = xQueueReceive(play_data, databuff, 0);
 	        hal_i2s_write(0,databuff,320,portMAX_DELAY);
-			vTaskPrioritySet(play_task, (uxPriority - 2));
-			vTaskDelayUntil(&xLastWakeTime, (20 / portTICK_PERIOD_MS));
-			taskYIELD();
-	//	}
-	
+			taskYIELD();	
 	}
 }
 
 static void record_task( void *pvParameters )
 {
-//   int client_fd;
-   portTickType xLastWakeTime;
-   unsigned portBASE_TYPE uxPriority;
-   uxPriority = uxTaskPriorityGet( NULL );
-//	client_fd=creat_server( htons(888), htonl(INADDR_ANY));
-//	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
-//	MESSAGE_SPEACH message_speach;
-	portBASE_TYPE xStatus;
-//	message_speach.message_type = SPEACH;
-	char *databuff = (char *)malloc(320);
+
+	portTickType xLastWakeTime;
 	xLastWakeTime = xTaskGetTickCount( );
-	int *p_sockfd = (int*)pvParameters;
+
+	portBASE_TYPE xStatus;
+	char *databuff = (char *)malloc(320);
 	for( ; ; )
 	{
 	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
-	//	xStatus = xQueueSendToBack(record_data,&message_speach, 0);
-		write( *p_sockfd, databuff,320);
-		vTaskPrioritySet(play_task, (uxPriority + 1));
-		vTaskDelayUntil(&xLastWakeTime, (20 / portTICK_PERIOD_MS));
+		xStatus = xQueueSendToBack(record_data, databuff, 0);
+		vTaskDelayUntil(&xLastWakeTime, (18 / portTICK_PERIOD_MS));
+	
+	}
+
+}
+static void recv_task( void *pvParameters )
+{
+	int sockfd;
+	portTickType xLastWakeTime;
+	unsigned portBASE_TYPE uxPriority;
+	vTaskDelay(65 / portTICK_PERIOD_MS);
+	connect_socket("127.0.0.1", 888, &sockfd);
+	portBASE_TYPE xStatus;
+	char *databuff = (char *)malloc(320);
+	xLastWakeTime = xTaskGetTickCount( );
+	for( ; ; )
+	{	
+			recv(sockfd, databuff, 320, 0);
+			xStatus = xQueueSendToBack(play_data,databuff, 0);
+			vTaskDelayUntil(&xLastWakeTime, (18 / portTICK_PERIOD_MS));	
+	}
+}
+
+static void send_task( void *pvParameters )
+{
+   int client_fd;
+   client_fd=creat_server( htons(888), htonl(INADDR_ANY));
+	portBASE_TYPE xStatus;
+	char *databuff = (char *)malloc(320);
+	for( ; ; )
+	{
+		xStatus = xQueueReceive(record_data, databuff, 0);
+		write( client_fd, databuff,320);
 		taskYIELD();
 	
 	}
@@ -226,14 +234,17 @@ void app_main()
     gpio_set_level(GPIO_OUTPUT_IO_0, 1);
 
     uint8_t cnt=0;
-	int sockfd_server_test;
-	sockfd_server_test = creat_server( htons(888), htonl(INADDR_ANY));
-	int sockfd_client_test;
-	connect_socket("127.0.0.1", 888, &sockfd_client_test);
+	
+//	int sockfd;
+//	connect_socket("192.168.1.119", 8887, &sockfd);
+//	int sockfd_server_test;
+//	sockfd_server_test = creat_server(htons(888), htonl(INADDR_ANY));
 
 //creat record xTask and play xTask
-	xTaskCreate(record_task, "record_task", 9000, &sockfd_server_test, 4, NULL);
-	xTaskCreate(play_task, "play_task", 4096, &sockfd_client_test, 3, NULL);
+	xTaskCreate(record_task, "record_task", 4096, NULL, 3, NULL);
+	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
+	xTaskCreate(recv_task, "recv_task", 4096, NULL, 3, NULL);
+	xTaskCreate(send_task, "send_task", 4096, NULL, 3, NULL);
 
     while(1){
         gpio_set_level(GPIO_OUTPUT_IO_0, cnt%2);
@@ -281,17 +292,15 @@ int creat_server(in_port_t in_port, in_addr_t in_addr)
       close(server_fd);
       return -1;
     }
-	/*
    client_fd = accept(server_fd, (struct sockaddr *)&client, &client_size);
     if (connect_socket < 0) {
         show_socket_error_reason("accept_server", client_fd);
         close(server_fd);
         return ESP_FAIL;
     }
-    //connection established，now can send/recv
+    /*connection established，now can send/recv*/
     ESP_LOGI(TAG, "tcp connection established!");
-	*/
-   	return server_fd;
+   	return client_fd;
  }
 
 int connect_socket(char *addr, int port, int *sockfd)
