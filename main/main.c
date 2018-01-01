@@ -99,16 +99,17 @@ static void play_task( void *pvParameters )
 static void record_task( void *pvParameters )
 {
 
-	portTickType xLastWakeTime;
-	xLastWakeTime = xTaskGetTickCount( );
 
 	portBASE_TYPE xStatus;
 	char *databuff = (char *)malloc(320);
+	portTickType xLastWakeTime;
+	xLastWakeTime = xTaskGetTickCount( );
 	for( ; ; )
 	{
 	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
 		xStatus = xQueueSendToBack(record_data, databuff, 0);
-		vTaskDelayUntil(&xLastWakeTime, (18 / portTICK_PERIOD_MS));
+		memset(record_data,0,320);
+		vTaskDelayUntil(&xLastWakeTime, (20 / portTICK_PERIOD_MS));
 	
 	}
 
@@ -121,13 +122,14 @@ static void recv_task( void *pvParameters )
 	vTaskDelay(65 / portTICK_PERIOD_MS);
 	connect_socket("127.0.0.1", 888, &sockfd);
 	portBASE_TYPE xStatus;
+	int recv_len = 0;
 	char *databuff = (char *)malloc(320);
-	int recv_len;
 	xLastWakeTime = xTaskGetTickCount( );
 	for( ; ; )
 	{	
 			recv_len = recv(sockfd, databuff, 320, 0);
 			xStatus = xQueueSendToBack(play_data,databuff, 0);
+		//	 hal_i2s_write(0,databuff,recv_len,portMAX_DELAY);
 			vTaskDelayUntil(&xLastWakeTime, (18 / portTICK_PERIOD_MS));	
 	}
 }
@@ -156,7 +158,7 @@ void app_main()
     event_engine_init();
     nvs_flash_init();
     tcpip_adapter_init();
-    wifi_init_sta("zhaoyang","12365478");
+    wifi_init_sta("wt","123654789");
     //wifi_init_softap();
     /*init gpio*/
     gpio_config_t io_conf;
