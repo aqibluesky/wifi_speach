@@ -281,15 +281,17 @@ int creat_server(in_port_t in_port, in_addr_t in_addr)
       close(server_fd);
       return -1;
     }
+	/*
    client_fd = accept(server_fd, (struct sockaddr *)&client, &client_size);
     if (connect_socket < 0) {
         show_socket_error_reason("accept_server", client_fd);
         close(server_fd);
         return ESP_FAIL;
     }
-    /*connection established，now can send/recv*/
+    //connection established，now can send/recv
     ESP_LOGI(TAG, "tcp connection established!");
-   	return client_fd;
+	*/
+   	return server_fd;
  }
 
 int connect_socket(char *addr, int port, int *sockfd)
