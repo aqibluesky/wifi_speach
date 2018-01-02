@@ -335,13 +335,13 @@ int init_codec()
     WM8978_SPKvol_Set(0);
     WM8978_HPvol_Set(15,15);
     WM8978_EQ_3D_Dir(0);
-	/*
-    WM8978_EQ1_Set(0,24);
+	
+    WM8978_EQ1_Set(2,24);
     WM8978_EQ2_Set(0,24);
     WM8978_EQ3_Set(0,24);
     WM8978_EQ4_Set(0,24);
-    WM8978_EQ5_Set(0,24);
-    */
+    WM8978_EQ5_Set(2,8);
+    
 	return 0;
 }
 int init_sd_card()
