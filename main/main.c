@@ -74,14 +74,16 @@ static void record_task( void *pvParameters )
 
 
 	portBASE_TYPE xStatus;
-	char *databuff = (char *)malloc(320);
+	char *databuff = (char *)malloc(1034);
+	int circle = SIZE_OF_20MS * 8;
+	while(circle--) hal_i2s_read(0,databuff,SIZE_OF_20MS,portMAX_DELAY);
 	portTickType xLastWakeTime;
 	xLastWakeTime = xTaskGetTickCount( );
 	for( ; ; )
 	{
-	    hal_i2s_read(0,databuff,320,portMAX_DELAY);
+	    hal_i2s_read(0,databuff,SIZE_OF_20MS,portMAX_DELAY);
 		xStatus = xQueueSendToBack(record_data, databuff, 0);
-		memset(databuff,0,320);
+		memset(databuff,0,SIZE_OF_20MS);
 		vTaskDelayUntil(&xLastWakeTime, (20 / portTICK_PERIOD_MS));
 	
 	}
@@ -100,7 +102,7 @@ static void recv_task( void *pvParameters )
 	xLastWakeTime = xTaskGetTickCount( );
 	for( ; ; )
 	{	
-			recv_len = recv(sockfd, databuff, 320, 0);
+			recv_len = recv(sockfd, databuff, SIZE_OF_20MS, 0);
 	//		xStatus = xQueueSendToBack(play_data,databuff, 0);
 			 hal_i2s_write(0,databuff,recv_len,portMAX_DELAY);
 			vTaskDelayUntil(&xLastWakeTime, (18 / portTICK_PERIOD_MS));	
@@ -112,11 +114,11 @@ static void send_task( void *pvParameters )
    int client_fd;
    client_fd=creat_server( htons(888), htonl(INADDR_ANY));
 	portBASE_TYPE xStatus;
-	char *databuff = (char *)malloc(320);
+	char *databuff = (char *)malloc(SIZE_OF_20MS);
 	for( ; ; )
 	{
 		xStatus = xQueueReceive(record_data, databuff, 0);
-		write( client_fd, databuff,320);
+		write( client_fd, databuff,SIZE_OF_20MS);
 		taskYIELD();
 	
 	}
@@ -136,8 +138,8 @@ void app_main()
     /*init codec */
   	init_codec();
     //creat queue
-	record_data = xQueueCreate( 10, 320);
-	play_data = xQueueCreate( 10, 320);
+	record_data = xQueueCreate( 10, SIZE_OF_20MS);
+	play_data = xQueueCreate( 10, SIZE_OF_20MS);
     /*init sd card*/
 	init_sd_card();
     //wait got ip address
@@ -321,7 +323,7 @@ int init_gpio()
 }
 int init_codec()
 {
-	  hal_i2c_init(0,19,18);
+	hal_i2c_init(0,19,18);
     hal_i2s_init(0,8000,16,1);
     WM8978_Init();
     WM8978_ADDA_Cfg(1,1); 
