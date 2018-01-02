@@ -55,6 +55,7 @@
 #define GPIO_OUTPUT_PIN_SEL  ((1<<GPIO_OUTPUT_IO_0))
 #define SIZE_OF_20MS  320
 
+esp_err_t err;
 xQueueHandle record_data;
 xQueueHandle play_data;
 	
@@ -125,8 +126,6 @@ static void send_task( void *pvParameters )
 
 void app_main()
 {
-
-    esp_err_t err;
     event_engine_init();
     nvs_flash_init();
     tcpip_adapter_init();
