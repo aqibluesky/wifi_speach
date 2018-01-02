@@ -55,27 +55,8 @@
 #define GPIO_OUTPUT_PIN_SEL  ((1<<GPIO_OUTPUT_IO_0))
 #define SIZE_OF_20MS  320
 
-	typedef enum _MESSAGE_TYPE{
-		CONTROL,
-		SPEACH	
-	}MESSAGE_TYPE;
-
-	typedef struct _MESSAGE_SPEACH{
-		MESSAGE_TYPE message_type;
-		char speach_data[SIZE_OF_20MS];
-	}MESSAGE_SPEACH;
-
-	typedef struct _MESSAGE_CONTROL{
-		MESSAGE_TYPE message_type;
-		int control_number;
-	}MESSAGE_CONTROL;
-
-	int MESSAGE_TYPE_SIZE = sizeof(MESSAGE_TYPE);
-	int MESSAGE_SPEACH_SIZE = sizeof(MESSAGE_SPEACH);
- 	int MESSAGE_CONTROL_SIZE = sizeof(MESSAGE_CONTROL);
-
-	xQueueHandle record_data;
-	xQueueHandle play_data;
+xQueueHandle record_data;
+xQueueHandle play_data;
 	
 int creat_server(in_port_t in_port, in_addr_t in_addr);
 int connect_socket(char *addr, int port, int *sockfd);
@@ -83,18 +64,9 @@ void send_data(int sockfd, char *databuff, int data_len);
 void recv_data(int sockfd, char *databuff, int data_len);
 int get_socket_error_code(int socket);
 int show_socket_error_reason(const char *str, int socket);
-
-static void play_task( void *pvParameters )
-{
-	portBASE_TYPE xStatus;
-	char *databuff = (char *)malloc(320);
-	for( ; ; )
-	{
-			xStatus = xQueueReceive(play_data, databuff, 0);
-	        hal_i2s_write(0,databuff,320,portMAX_DELAY);
-			taskYIELD();	
-	}
-}
+int init_gpio();
+int init_codec();
+int init_sd_card();
 
 static void record_task( void *pvParameters )
 {
@@ -161,53 +133,14 @@ void app_main()
     wifi_init_sta("zhaoyang","12345678");
     //wifi_init_softap();
     /*init gpio*/
-    gpio_config_t io_conf;
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = GPIO_OUTPUT_PIN_SEL;
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
-    gpio_set_level(GPIO_OUTPUT_IO_0, 0);
+	init_gpio();
     /*init codec */
-    hal_i2c_init(0,19,18);
-    hal_i2s_init(0,8000,16,1);
-    WM8978_Init();
-    WM8978_ADDA_Cfg(1,1); 
-    WM8978_Input_Cfg(1,0,0);     
-    WM8978_Output_Cfg(1,0); 
-    WM8978_MIC_Gain(60);
-    WM8978_AUX_Gain(0);
-    WM8978_LINEIN_Gain(0);
-    WM8978_SPKvol_Set(0);
-    WM8978_HPvol_Set(15,15);
-    WM8978_EQ_3D_Dir(0);
-    WM8978_EQ1_Set(0,24);
-    WM8978_EQ2_Set(0,24);
-    WM8978_EQ3_Set(0,24);
-    WM8978_EQ4_Set(0,24);
-    WM8978_EQ5_Set(0,24);
+  	init_codec();
     //creat queue
 	record_data = xQueueCreate( 10, 320);
 	play_data = xQueueCreate( 10, 320);
     /*init sd card*/
-    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
-        .format_if_mount_failed = true,
-        .max_files = 10
-    };
-    sdmmc_card_t* card;
-    err = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot_config, &mount_config, &card);
-    if (err != ESP_OK) {
-        if (err == ESP_FAIL) {
-            printf("Failed to mount filesystem. If you want the card to be formatted, set format_if_mount_failed = true.");
-        } else {
-            printf("Failed to initialize the card (%d). Make sure SD card lines have pull-up resistors in place.", err);
-        }
-        return;
-    }
-    sdmmc_card_print_info(stdout, card);
+	init_sd_card();
     //wait got ip address
     xEventGroupWaitBits(station_event_group,STA_GOTIP_BIT,pdTRUE,pdTRUE,portMAX_DELAY);
     ESP_LOGI(TAG,"got ip address");
@@ -238,29 +171,18 @@ void app_main()
 
     uint8_t cnt=0;
 	
-//	int sockfd;
-//	connect_socket("192.168.1.119", 8887, &sockfd);
-//	int sockfd_server_test;
-//	sockfd_server_test = creat_server(htons(888), htonl(INADDR_ANY));
-
 //creat record xTask and play xTask
 	xTaskCreate(record_task, "record_task", 4096, NULL, 3, NULL);
-//	xTaskCreate(play_task, "play_task", 4096, NULL, 3, NULL);
 	xTaskCreate(recv_task, "recv_task", 4096, NULL, 3, NULL);
 	xTaskCreate(send_task, "send_task", 4096, NULL, 3, NULL);
 
     while(1){
         gpio_set_level(GPIO_OUTPUT_IO_0, cnt%2);
-        //memset(samples_data,0,1024);
-        //vTaskDelay(1000 / portTICK_PERIOD_MS);
         //vTaskSuspend(NULL);
         //ESP_LOGI(TAG, "cnt:%d",cnt);
        // aplay_mp3("/sdcard/music.mp3");
        // aplay_wav("/sdcard/music.wav");
-//        hal_i2s_read(0,samples_data,320,portMAX_DELAY);
-//	send(test_client_sockfd, samples_data, 320*50, 0);
-//        hal_i2s_write(0,samples_data,320,portMAX_DELAY);
-      //  vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
         cnt++;
     }
 }
@@ -386,4 +308,58 @@ int show_socket_error_reason(const char *str, int socket)
     return err;
 }
 
+int init_gpio()
+{
+	gpio_config_t io_conf;
+    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = GPIO_OUTPUT_PIN_SEL;
+    io_conf.pull_down_en = 0;
+    io_conf.pull_up_en = 0;
+    gpio_config(&io_conf);
+    gpio_set_level(GPIO_OUTPUT_IO_0, 0);
+	return 0;
+}
+int init_codec()
+{
+	  hal_i2c_init(0,19,18);
+    hal_i2s_init(0,8000,16,1);
+    WM8978_Init();
+    WM8978_ADDA_Cfg(1,1); 
+    WM8978_Input_Cfg(1,0,0);     
+    WM8978_Output_Cfg(1,0); 
+    WM8978_MIC_Gain(60);
+    WM8978_AUX_Gain(0);
+    WM8978_LINEIN_Gain(0);
+    WM8978_SPKvol_Set(0);
+    WM8978_HPvol_Set(15,15);
+    WM8978_EQ_3D_Dir(0);
+    WM8978_EQ1_Set(0,24);
+    WM8978_EQ2_Set(0,24);
+    WM8978_EQ3_Set(0,24);
+    WM8978_EQ4_Set(0,24);
+    WM8978_EQ5_Set(0,24);
+	return 0;
+}
+int init_sd_card()
+{
+	    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+        .format_if_mount_failed = true,
+        .max_files = 10
+    };
+    sdmmc_card_t* card;
+    err = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot_config, &mount_config, &card);
+    if (err != ESP_OK) {
+        if (err == ESP_FAIL) {
+            printf("Failed to mount filesystem. If you want the card to be formatted, set format_if_mount_failed = true.");
+        } else {
+            printf("Failed to initialize the card (%d). Make sure SD card lines have pull-up resistors in place.", err);
+        }
+        return 0;
+    }
+    sdmmc_card_print_info(stdout, card);
+	return 0;
+}
 
